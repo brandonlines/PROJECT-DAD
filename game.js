@@ -6,6 +6,20 @@ const DIFFICULTY_COOP_MULT = 2.1;
 const PX_PER_M = 3;
 const TRASH_SPAWN_INTERVAL_M = 13;
 const RESISTANCE_TYPES = ["sword", "fireball", "shield", "arrow"];
+const START_LINE_M = 20;
+
+const PERKS = {
+  1: "Sprint unlocked (Space)",
+  2: "Throwing knives: arrows deal 2x damage",
+  3: "Dual swords: sword deals 2x damage",
+  4: "Sidekick joins: 10% enemy HP damage every 3s",
+  5: "Fireball V: fireball deals 5x damage, costs 2x mana",
+  6: "Vitality: +25% max health",
+  7: "Explodable TNT arrows: 6x damage + area splash",
+  8: "Mana Vessel: +25% max mana",
+  9: "Haste: +50% speed",
+  10: "Baby dragon: breath deletes trash enemies"
+};
 
 const SPELLS = [
   { key: "j", keyP2: "6", type: "sword", name: "Sword", color: "#e3d3ac", damage: 44, mana: 0, cooldown: 0.4, meleeRange: 22, knockback: 15 },
@@ -46,6 +60,7 @@ const app = {
 const ctx = app.canvas.getContext("2d");
 const input = {
   keys: new Set(),
+  codes: new Set(),
   p1TouchDir: { x: 0, y: 0 }
 };
 
@@ -102,13 +117,17 @@ function setupUI() {
   window.addEventListener("resize", resizeCanvas);
   window.addEventListener("keydown", (e) => {
     input.keys.add(e.key.toLowerCase());
+    input.codes.add(e.code.toLowerCase());
     if (e.key === "Escape" && scene === "playing") {
       setScene("pause");
     } else if (e.key === "Escape" && scene === "pause") {
       setScene("playing");
     }
   });
-  window.addEventListener("keyup", (e) => input.keys.delete(e.key.toLowerCase()));
+  window.addEventListener("keyup", (e) => {
+    input.keys.delete(e.key.toLowerCase());
+    input.codes.delete(e.code.toLowerCase());
+  });
 
   SPELLS.forEach((s, i) => {
     const token = document.createElement("div");
@@ -222,13 +241,14 @@ function startRun(plusMode) {
     pickups: [],
     combatLog: { kills: 0, bosses: 0 },
     totalDistance: 0,
-    startMs: performance.now(),
+    startMs: null,
     levelState: null
   };
 
   const baseLevel = plusMode ? clamp(save.persistentLevel, 1, 10) : 1;
   run.players.push(createPlayer(1, save.character, baseLevel, 0));
   if (run.coop) run.players.push(createPlayer(2, save.character, baseLevel, 1));
+  run.players.forEach((p) => applyPerkStatBonuses(p, p.level));
 
   initLevel(1);
   setScene("playing");
@@ -254,6 +274,7 @@ function createPlayer(id, character, level, laneOffset) {
     mp: mpBase + (level - 1) * 18,
     speed: 58 + (level - 1) * 1.9,
     cooldowns: SPELLS.map(() => 0),
+    appliedPerks: new Set(),
     alive: true
   };
 }
@@ -272,12 +293,14 @@ function initLevel(levelIndex) {
   });
 
   run.levelState = {
-    nextTrashSpawnM: TRASH_SPAWN_INTERVAL_M,
+    nextTrashSpawnM: START_LINE_M + TRASH_SPAWN_INTERVAL_M,
     miniSpawned: new Set(),
     miniDefeated: new Set(),
     bigSpawned: false,
     bigDefeated: false,
     finalDefeated: false,
+    journeyStarted: false,
+    startLineM: START_LINE_M,
     levelStartMs: performance.now()
   };
 }
@@ -311,8 +334,10 @@ function tickGame(dt) {
   }
 
   updatePlayers(dt);
+  updateJourneyState();
   updateSpawns();
   updateEnemies(dt);
+  updateCompanions(dt);
   updateProjectiles(dt);
   updatePickups(dt);
 
@@ -358,6 +383,10 @@ function completeCurrentLevel() {
         p.hp = p.maxHp;
         p.mp = p.maxMp;
         p.speed += 1.8;
+        applyPerkStatBonuses(p, p.level);
+        if (PERKS[p.level] && p.id === 1) {
+          setNotice(`Perk ${p.level}: ${PERKS[p.level]}`, 3.2);
+        }
       }
     });
     save.persistentLevel = Math.max(save.persistentLevel, run.players[0].level);
@@ -370,7 +399,8 @@ function completeCurrentLevel() {
 }
 
 function endRun(victory, summary) {
-  const elapsedSec = Math.floor((performance.now() - run.startMs) / 1000);
+  const startedAt = run.startMs || performance.now();
+  const elapsedSec = Math.floor((performance.now() - startedAt) / 1000);
   const score = calcScore(victory, elapsedSec);
 
   save.highScores.push({
@@ -457,7 +487,8 @@ function movementFromInputP2() {
 }
 
 function movePlayer(player, dir, dt) {
-  player.x = clamp(player.x + dir.x * player.speed * dt, 0, LEVEL_LENGTH_M + 2);
+  const sprintMul = hasPerk(1) && input.codes.has("space") && player.id === 1 ? 1.65 : 1;
+  player.x = clamp(player.x + dir.x * player.speed * sprintMul * dt, 0, LEVEL_LENGTH_M + 2);
   player.y = clamp(player.y + dir.y * player.speed * dt, -62, 62);
 }
 
@@ -471,12 +502,13 @@ function handleSpellInput(player, isP2) {
 function castSpell(player, spellIdx) {
   if (!player?.alive) return;
   const spell = SPELLS[spellIdx];
-  if (player.cooldowns[spellIdx] > 0 || player.mp < spell.mana) return;
+  const manaCost = effectiveManaCost(spell);
+  if (player.cooldowns[spellIdx] > 0 || player.mp < manaCost) return;
 
   const target = nearestEnemy(player, 240);
   const dir = target ? normalizeVec(target.x - player.x, target.y - player.y) : { x: 1, y: 0 };
 
-  player.mp -= spell.mana;
+  player.mp -= manaCost;
   player.cooldowns[spellIdx] = spell.cooldown;
 
   if (spell.selfShield) {
@@ -506,6 +538,7 @@ function castSpell(player, spellIdx) {
 }
 
 function updateSpawns() {
+  if (!run.levelState.journeyStarted) return;
   const lead = Math.max(...run.players.filter((p) => p.alive).map((p) => p.x));
 
   while (run.levelState.nextTrashSpawnM <= Math.min(lead + 170, LEVEL_LENGTH_M - 15)) {
@@ -542,7 +575,7 @@ function spawnEnemy(type, x, y) {
 
   const template = {
     trash: { hp: 34 + lvl * 6, speed: 28 + lvl * 0.8, damage: 16 + lvl * 1.2, radius: 6.2, color: "#a26a52", score: 1 },
-    mini: { hp: 390 + lvl * 70, speed: 22 + lvl * 0.5, damage: 36 + lvl * 2.4, radius: 10, color: "#b67a3c", score: 40 },
+    mini: { hp: 760 + lvl * 130, speed: 20 + lvl * 0.4, damage: 72 + lvl * 4.2, radius: 10.8, color: "#b67a3c", score: 40 },
     big: { hp: 700 + lvl * 130, speed: 19 + lvl * 0.5, damage: 52 + lvl * 3.8, radius: 13, color: "#bd4a4a", score: 120 },
     final: { hp: 4100, speed: 26, damage: 84, radius: 18, color: "#d4c977", score: 500 }
   }[type];
@@ -561,7 +594,10 @@ function spawnEnemy(type, x, y) {
     alive: true,
     slowTimer: 0,
     burnTimer: 0,
-    resistanceType: type === "trash" ? pickRandom(RESISTANCE_TYPES) : null
+    resistanceType: type === "trash" ? pickRandom(RESISTANCE_TYPES) : null,
+    spawnX: x,
+    borderMinX: type === "mini" ? x - 25 : null,
+    borderMaxX: type === "mini" ? x + 25 : null
   });
 }
 
@@ -581,6 +617,9 @@ function updateEnemies(dt) {
     const slowMul = enemy.slowTimer > 0 ? 0.55 : 1;
     enemy.x += dir.x * enemy.speed * slowMul * dt;
     enemy.y += dir.y * enemy.speed * slowMul * dt;
+    if (enemy.type === "mini") {
+      enemy.x = clamp(enemy.x, enemy.borderMinX, enemy.borderMaxX);
+    }
 
     const dist = distance(enemy.x, enemy.y, target.x, target.y);
     if (dist < enemy.radius + target.radius + 2.5) {
@@ -674,6 +713,44 @@ function updatePickups(dt) {
   }
 
   run.pickups = run.pickups.filter((p) => p.ttl > 0);
+}
+
+function updateJourneyState() {
+  if (!run?.levelState) return;
+  if (run.levelState.journeyStarted) return;
+  const leadX = Math.max(...run.players.filter((p) => p.alive).map((p) => p.x));
+  if (leadX >= run.levelState.startLineM) {
+    run.levelState.journeyStarted = true;
+    if (!run.startMs) run.startMs = performance.now();
+    setNotice("Journey started. Enemies advancing.", 2.2);
+  }
+}
+
+function updateCompanions(dt) {
+  if (!run.levelState.journeyStarted) return;
+
+  if (hasPerk(4)) {
+    run.levelState.sidekickTimer = (run.levelState.sidekickTimer || 3) - dt;
+    if (run.levelState.sidekickTimer <= 0) {
+      run.levelState.sidekickTimer = 3;
+      const target = findCompanionTarget();
+      if (target) target.hp -= target.maxHp * 0.1;
+    }
+  }
+
+  if (hasPerk(10)) {
+    run.levelState.dragonTimer = (run.levelState.dragonTimer || 4) - dt;
+    if (run.levelState.dragonTimer <= 0) {
+      run.levelState.dragonTimer = 4;
+      const leadX = Math.max(...run.players.filter((p) => p.alive).map((p) => p.x));
+      for (const enemy of run.enemies) {
+        if (!enemy.alive || enemy.type !== "trash") continue;
+        if (enemy.x >= leadX - 40 && enemy.x <= leadX + 180) {
+          enemy.hp = 0;
+        }
+      }
+    }
+  }
 }
 
 function nearestPlayer(enemy) {
@@ -789,6 +866,8 @@ function drawWorld(w, h) {
   }
 
   drawMarkers(roadY + 20);
+  drawStartLine(roadY + 18);
+  drawMiniBossBorders(roadY + 16);
 }
 
 function drawMarkers(screenY) {
@@ -810,6 +889,33 @@ function drawMarkers(screenY) {
     ctx.fillStyle = run.levelIndex === 11 ? "#dbcf85" : "#d56e6e";
     ctx.fillRect(bossX - 3, screenY - 38, 6, 38);
     ctx.fillText(run.levelIndex === 11 ? "Final" : "Boss", bossX, screenY - 42);
+  }
+}
+
+function drawStartLine(screenY) {
+  const x = worldToScreenX(run.levelState.startLineM);
+  if (x < -80 || x > window.innerWidth + 80) return;
+  ctx.fillStyle = run.levelState.journeyStarted ? "#70bf77" : "#eacb7a";
+  ctx.fillRect(x - 4, screenY - 36, 8, 36);
+  ctx.fillStyle = "#f3e9cb";
+  ctx.font = "10px Cinzel";
+  ctx.textAlign = "center";
+  ctx.fillText(run.levelState.journeyStarted ? "START CLEARED" : "START", x, screenY - 40);
+}
+
+function drawMiniBossBorders(screenY) {
+  for (const enemy of run.enemies) {
+    if (!enemy.alive || enemy.type !== "mini") continue;
+    const minX = worldToScreenX(enemy.borderMinX);
+    const maxX = worldToScreenX(enemy.borderMaxX);
+    ctx.strokeStyle = "rgba(215, 121, 78, 0.65)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(minX, screenY - 28);
+    ctx.lineTo(minX, screenY + 10);
+    ctx.moveTo(maxX, screenY - 28);
+    ctx.lineTo(maxX, screenY + 10);
+    ctx.stroke();
   }
 }
 
@@ -953,7 +1059,9 @@ function updateHud() {
 
   const mini = run.levelState.miniDefeated.size;
   const bossState = run.levelIndex === 11 ? run.levelState.finalDefeated : run.levelState.bigDefeated;
-  app.meta.textContent = `L${run.levelIndex}/11 | Player Lv ${p1.level}/10 | Distance ${Math.floor(p1.x)}/${LEVEL_LENGTH_M}m | Mini ${mini}/3 | Boss ${bossState ? "down" : "up"}`;
+  const sprintState = hasPerk(1) ? "Sprint:Space" : "No Sprint";
+  const started = run.levelState.journeyStarted ? "On Route" : "Cross Start Line";
+  app.meta.textContent = `L${run.levelIndex}/11 | Player Lv ${p1.level}/10 | ${started} | ${sprintState} | Distance ${Math.floor(p1.x)}/${LEVEL_LENGTH_M}m | Mini ${mini}/3 | Boss ${bossState ? "down" : "up"}`;
 }
 
 function quitToMenu() {
@@ -989,12 +1097,20 @@ function pickRandom(values) {
 }
 
 function applySpellHit(enemy, spell, owner) {
-  const levelMult = 1 + ((owner?.level || 1) - 1) * 0.12;
-  const baseDamage = spell.damage * levelMult;
-  enemy.hp -= applyEnemyResistance(enemy, spell.type, baseDamage);
+  const baseDamage = effectiveSpellDamage(spell, owner);
+  const dealt = applyEnemyResistance(enemy, spell.type, baseDamage);
+  enemy.hp -= dealt;
 
   if (spell.slow) enemy.slowTimer = Math.max(enemy.slowTimer, spell.slow);
   if (spell.burn) enemy.burnTimer = Math.max(enemy.burnTimer, spell.burn);
+  if (spell.type === "arrow" && hasPerk(7)) {
+    for (const nearby of run.enemies) {
+      if (!nearby.alive || nearby === enemy) continue;
+      if (distance(enemy.x, enemy.y, nearby.x, nearby.y) <= 18) {
+        nearby.hp -= applyEnemyResistance(nearby, spell.type, dealt * 0.5);
+      }
+    }
+  }
 }
 
 function applyEnemyResistance(enemy, attackType, damage) {
@@ -1006,4 +1122,59 @@ function applyEnemyResistance(enemy, attackType, damage) {
 
 function isTouchDevice() {
   return window.matchMedia("(pointer: coarse)").matches;
+}
+
+function hasPerk(level) {
+  return (run?.players?.[0]?.level || 1) >= level;
+}
+
+function effectiveSpellDamage(spell, owner) {
+  const levelMult = 1 + ((owner?.level || 1) - 1) * 0.12;
+  let mult = 1;
+  if (spell.type === "arrow") {
+    if (hasPerk(7)) mult *= 6;
+    else if (hasPerk(2)) mult *= 2;
+  }
+  if (spell.type === "sword" && hasPerk(3)) mult *= 2;
+  if (spell.type === "fireball" && hasPerk(5)) mult *= 5;
+  return spell.damage * levelMult * mult;
+}
+
+function effectiveManaCost(spell) {
+  if (spell.type === "fireball" && hasPerk(5)) return spell.mana * 2;
+  return spell.mana;
+}
+
+function applyPerkStatBonuses(player, targetLevel) {
+  for (let level = 1; level <= targetLevel; level += 1) {
+    if (player.appliedPerks.has(level)) continue;
+    if (level === 6) {
+      player.maxHp *= 1.25;
+      player.hp = player.maxHp;
+    }
+    if (level === 8) {
+      player.maxMp *= 1.25;
+      player.mp = player.maxMp;
+    }
+    if (level === 9) {
+      player.speed *= 1.5;
+    }
+    player.appliedPerks.add(level);
+  }
+}
+
+function findCompanionTarget() {
+  let best = null;
+  let bestDist = Infinity;
+  const lead = run.players.filter((p) => p.alive).sort((a, b) => b.x - a.x)[0];
+  if (!lead) return null;
+  for (const enemy of run.enemies) {
+    if (!enemy.alive) continue;
+    const d = distance(enemy.x, enemy.y, lead.x, lead.y);
+    if (d < bestDist && d < 220) {
+      bestDist = d;
+      best = enemy;
+    }
+  }
+  return best;
 }

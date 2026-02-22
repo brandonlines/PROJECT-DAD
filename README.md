@@ -8,6 +8,7 @@ Browser RPG built for GitHub Pages hosting.
 - Level 11: final boss trial.
 - Level cap: 10.
 - You gain exactly +1 level only when all 3 mini-bosses and the big boss are defeated in a level.
+- Start line gate: each level begins with a start line; players must cross it to begin enemy spawns and the journey timer.
 - Low-tier enemies spawn every 13m and drop health/mana pickups.
 - Medieval Greece visual theme.
 - Character creator:
@@ -16,14 +17,28 @@ Browser RPG built for GitHub Pages hosting.
 - Weapon/ability kit: sword, fireball, shield bash, arrow.
 - Co-play toggle:
 - Adds second player and makes enemies 2.1x harder.
+- Mini-bosses are stronger and are constrained to a clear 50m combat border (+/-25m from their spawn point).
 - +Mode:
 - Unlocks after full game clear, keeps earned level between runs.
 - Pause menu includes high-score board.
 - Desktop and mobile-friendly controls.
 
+## Perk Ladder (Levels 1-10)
+- 1. Sprint unlocked (`Space`)
+- 2. Throwing knives: arrow damage x2
+- 3. Dual wielding swords: sword damage x2
+- 4. Sidekick: friendly NPC deals 10% enemy max HP every 3 seconds
+- 5. Fireball V: fireball damage x5 and mana cost x2
+- 6. +25% max health
+- 7. Explodable TNT arrows: arrow damage x6 with area effect
+- 8. +25% max mana
+- 9. +50% movement speed
+- 10. Friendly baby dragon breath: deletes trash enemies
+
 ## Controls
 - Desktop:
 - P1 movement: `WASD`
+- P1 sprint: `Space` (after perk 1)
 - P1 attacks: `J` sword, `I` fireball, `K` shield bash, `L` arrow
 - P2 movement (co-op): `Arrow Keys`
 - P2 attacks (co-op): `6 7 8 9`
