@@ -25,6 +25,7 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 canvas {
@@ -166,41 +167,59 @@ label {
 
 .touch {
   position: absolute;
-  inset: auto 0 8px 0;
+  inset: auto 0 10px 0;
   display: flex;
   justify-content: space-between;
-  padding: 0 10px;
+  padding: 0 12px;
   pointer-events: none;
 }
 
 #movePad,
-#spellButtons button {
+#spellButtons button,
+.touchUtil {
   pointer-events: auto;
   border: 1px solid #8b9bb4;
   background: rgba(14, 23, 36, 0.74);
   color: var(--text);
-  border-radius: 50%;
+  touch-action: none;
 }
 
 #movePad {
-  width: 96px;
-  height: 96px;
+  width: 120px;
+  height: 120px;
   display: grid;
   place-items: center;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  border-radius: 50%;
+}
+
+.touchActions {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  align-content: end;
+}
+
+.touchUtil {
+  min-width: 86px;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
 }
 
 #spellButtons {
   display: grid;
-  grid-template-columns: repeat(3, 56px);
-  gap: 8px;
+  grid-template-columns: repeat(2, 70px);
+  gap: 10px;
   align-content: end;
 }
 
 #spellButtons button {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
+  width: 70px;
+  height: 70px;
+  border-radius: 18px;
+  font-size: 1rem;
 }
 
 ol {
@@ -212,6 +231,12 @@ ol {
 @media (max-width: 900px) {
   .hud {
     grid-template-columns: 1fr;
+    font-size: 0.88rem;
+    top: 6px;
+    left: 6px;
+    right: 6px;
+    gap: 6px;
+    padding: 6px 8px;
   }
 
   .touch {

@@ -26,7 +26,7 @@
         <span>Enable Co-Play (2.1x enemy scaling)</span>
       </label>
       <p class="hint">Desktop: P1 `WASD` + `Space` sprint + `J/I/K/L` | P2 `Arrows` + `6-9` | Pause `Esc`</p>
-      <p class="hint">Mobile: Touch left zone to move, use spell buttons on right.</p>
+      <p class="hint">Mobile: Left pad to move, right buttons for attacks, plus on-screen Sprint and Pause.</p>
     </section>
 
     <section id="creatorScreen" class="overlay">
@@ -117,7 +117,11 @@
 
     <div id="touchControls" class="touch hidden">
       <div id="movePad">Move</div>
-      <div id="spellButtons"></div>
+      <div class="touchActions">
+        <button id="touchSprintBtn" class="touchUtil">SPRINT</button>
+        <button id="touchPauseBtn" class="touchUtil">PAUSE</button>
+        <div id="spellButtons"></div>
+      </div>
     </div>
   </main>
 

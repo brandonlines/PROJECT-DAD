@@ -53,6 +53,8 @@ const app = {
   touchControls: document.getElementById("touchControls"),
   movePad: document.getElementById("movePad"),
   spellButtons: document.getElementById("spellButtons"),
+  touchSprintBtn: document.getElementById("touchSprintBtn"),
+  touchPauseBtn: document.getElementById("touchPauseBtn"),
   plusModeBtn: document.getElementById("plusModeBtn"),
   coopToggle: document.getElementById("coopToggle")
 };
@@ -61,14 +63,15 @@ const ctx = app.canvas.getContext("2d");
 const input = {
   keys: new Set(),
   codes: new Set(),
-  p1TouchDir: { x: 0, y: 0 }
+  p1TouchDir: { x: 0, y: 0 },
+  touchSprint: false
 };
 
 let save = loadSave();
 let run = null;
 let scene = "menu";
 let lastTs = 0;
-let notice = { text: "", timer: 0 };
+let notice = { text: "", timer: 0, placement: "inline" };
 let cameraX = 0;
 
 setupUI();
@@ -138,7 +141,8 @@ function setupUI() {
     const b = document.createElement("button");
     b.textContent = s.key.toUpperCase();
     b.title = s.name;
-    b.addEventListener("click", () => {
+    b.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
       if (scene === "playing" && run) castSpell(run.players[0], i);
     });
     app.spellButtons.appendChild(b);
@@ -175,6 +179,29 @@ function setupTouchPad() {
 
   app.movePad.addEventListener("pointerup", reset);
   app.movePad.addEventListener("pointercancel", reset);
+
+  if (app.touchSprintBtn) {
+    const enableSprint = (e) => {
+      e.preventDefault();
+      input.touchSprint = true;
+    };
+    const disableSprint = (e) => {
+      e.preventDefault();
+      input.touchSprint = false;
+    };
+    app.touchSprintBtn.addEventListener("pointerdown", enableSprint);
+    app.touchSprintBtn.addEventListener("pointerup", disableSprint);
+    app.touchSprintBtn.addEventListener("pointercancel", disableSprint);
+    app.touchSprintBtn.addEventListener("pointerleave", disableSprint);
+  }
+
+  if (app.touchPauseBtn) {
+    app.touchPauseBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if (scene === "playing") setScene("pause");
+      else if (scene === "pause") setScene("playing");
+    });
+  }
 }
 
 function hydrateCreatorForm() {
@@ -215,11 +242,16 @@ function resizeCanvas() {
 
 function setScene(next) {
   scene = next;
+  if (next !== "playing") {
+    input.touchSprint = false;
+    input.p1TouchDir.x = 0;
+    input.p1TouchDir.y = 0;
+  }
   for (const overlay of [app.menu, app.creator, app.pause, app.end]) {
     overlay.classList.remove("visible");
   }
   app.hud.classList.toggle("hidden", next !== "playing" && next !== "pause");
-  app.touchControls.classList.toggle("hidden", !isTouchDevice());
+  app.touchControls.classList.toggle("hidden", !isTouchDevice() || (next !== "playing" && next !== "pause"));
 
   if (next === "menu") app.menu.classList.add("visible");
   if (next === "creator") app.creator.classList.add("visible");
@@ -385,7 +417,7 @@ function completeCurrentLevel() {
         p.speed += 1.8;
         applyPerkStatBonuses(p, p.level);
         if (PERKS[p.level] && p.id === 1) {
-          setNotice(`Perk ${p.level}: ${PERKS[p.level]}`, 3.2);
+          setNotice(`Perk ${p.level}: ${PERKS[p.level]}`, 3.2, "top");
         }
       }
     });
@@ -487,7 +519,8 @@ function movementFromInputP2() {
 }
 
 function movePlayer(player, dir, dt) {
-  const sprintMul = hasPerk(1) && input.codes.has("space") && player.id === 1 ? 1.65 : 1;
+  const sprintActive = input.codes.has("space") || input.touchSprint;
+  const sprintMul = hasPerk(1) && sprintActive && player.id === 1 ? 1.65 : 1;
   player.x = clamp(player.x + dir.x * player.speed * sprintMul * dt, 0, LEVEL_LENGTH_M + 2);
   player.y = clamp(player.y + dir.y * player.speed * dt, -62, 62);
 }
@@ -809,11 +842,15 @@ function renderGame(dt) {
 
   if (notice.timer > 0) {
     ctx.fillStyle = "rgba(8, 12, 19, 0.8)";
-    ctx.fillRect(w * 0.28, 72, w * 0.44, 32);
+    const topMode = notice.placement === "top";
+    const bannerY = topMode ? 8 : 72;
+    const bannerW = topMode ? w * 0.62 : w * 0.44;
+    const bannerX = (w - bannerW) * 0.5;
+    ctx.fillRect(bannerX, bannerY, bannerW, 32);
     ctx.fillStyle = "#f5e8b5";
     ctx.font = "600 16px Cinzel";
     ctx.textAlign = "center";
-    ctx.fillText(notice.text, w * 0.5, 93);
+    ctx.fillText(notice.text, w * 0.5, bannerY + 21);
   }
 
   if (scene === "pause") {
@@ -1059,7 +1096,7 @@ function updateHud() {
 
   const mini = run.levelState.miniDefeated.size;
   const bossState = run.levelIndex === 11 ? run.levelState.finalDefeated : run.levelState.bigDefeated;
-  const sprintState = hasPerk(1) ? "Sprint:Space" : "No Sprint";
+  const sprintState = hasPerk(1) ? "Sprint:Space/Touch" : "No Sprint";
   const started = run.levelState.journeyStarted ? "On Route" : "Cross Start Line";
   app.meta.textContent = `L${run.levelIndex}/11 | Player Lv ${p1.level}/10 | ${started} | ${sprintState} | Distance ${Math.floor(p1.x)}/${LEVEL_LENGTH_M}m | Mini ${mini}/3 | Boss ${bossState ? "down" : "up"}`;
 }
@@ -1069,9 +1106,10 @@ function quitToMenu() {
   setScene("menu");
 }
 
-function setNotice(text, duration) {
+function setNotice(text, duration, placement = "inline") {
   notice.text = text;
   notice.timer = duration;
+  notice.placement = placement;
 }
 
 function normalizeVec(x, y) {

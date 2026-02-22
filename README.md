@@ -45,10 +45,15 @@ Browser RPG built for GitHub Pages hosting.
 - Pause/Resume: `Esc`
 - Mobile:
 - Touch move pad (left)
-- Spell buttons (right)
+- Touch attack buttons (right)
+- On-screen `SPRINT` and `PAUSE`
 
-## Local Run
-Open `index.html` directly, or run a static server:
+## Play Static Page
+Live GitHub Pages build:
+[https://brandonlines.github.io/PROJECT-DAD/](https://brandonlines.github.io/PROJECT-DAD/)
+
+## Run (Development)
+Serve the project as static files:
 
 ```bash
 python3 -m http.server 8080
