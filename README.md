@@ -40,13 +40,14 @@ Browser RPG built for GitHub Pages hosting.
 - P1 movement: `WASD`
 - P1 sprint: `Space` (after perk 1)
 - P1 attacks: `J` sword, `I` fireball, `K` shield bash, `L` arrow
+- P1 heal: `H` (mana-cost instant heal)
 - P2 movement (co-op): `Arrow Keys`
 - P2 attacks (co-op): `6 7 8 9`
 - Pause/Resume: `Esc`
 - Mobile:
 - Touch move pad (left)
 - Touch attack buttons (right)
-- On-screen `SPRINT` and `PAUSE`
+- On-screen `SPRINT`, `HEAL`, and `PAUSE`
 
 ## Play Static Page
 Live GitHub Pages build:

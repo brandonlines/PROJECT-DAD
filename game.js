@@ -7,6 +7,10 @@ const PX_PER_M = 3;
 const TRASH_SPAWN_INTERVAL_M = 13;
 const RESISTANCE_TYPES = ["sword", "fireball", "shield", "arrow"];
 const START_LINE_M = 20;
+const HEAL_KEY = "h";
+const HEAL_MANA_COST = 34;
+const HEAL_COOLDOWN_S = 6;
+const HEAL_PERCENT = 0.3;
 
 const PERKS = {
   1: "Sprint unlocked (Space)",
@@ -54,6 +58,7 @@ const app = {
   movePad: document.getElementById("movePad"),
   spellButtons: document.getElementById("spellButtons"),
   touchSprintBtn: document.getElementById("touchSprintBtn"),
+  touchHealBtn: document.getElementById("touchHealBtn"),
   touchPauseBtn: document.getElementById("touchPauseBtn"),
   plusModeBtn: document.getElementById("plusModeBtn"),
   coopToggle: document.getElementById("coopToggle")
@@ -139,7 +144,7 @@ function setupUI() {
     app.spellPanel.appendChild(token);
 
     const b = document.createElement("button");
-    b.textContent = s.key.toUpperCase();
+    b.innerHTML = `<span class="keycap">${s.key.toUpperCase()}</span><span class="touchLabel">${s.name.toUpperCase()}</span>`;
     b.title = s.name;
     b.addEventListener("pointerdown", (e) => {
       e.preventDefault();
@@ -147,6 +152,10 @@ function setupUI() {
     });
     app.spellButtons.appendChild(b);
   });
+  const healToken = document.createElement("div");
+  healToken.className = "spell";
+  healToken.textContent = `P1 ${HEAL_KEY.toUpperCase()}: Heal`;
+  app.spellPanel.appendChild(healToken);
 
   setupTouchPad();
   hydrateCreatorForm();
@@ -200,6 +209,13 @@ function setupTouchPad() {
       e.preventDefault();
       if (scene === "playing") setScene("pause");
       else if (scene === "pause") setScene("playing");
+    });
+  }
+
+  if (app.touchHealBtn) {
+    app.touchHealBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if (scene === "playing" && run?.players?.[0]) tryHeal(run.players[0]);
     });
   }
 }
@@ -306,6 +322,7 @@ function createPlayer(id, character, level, laneOffset) {
     mp: mpBase + (level - 1) * 18,
     speed: 58 + (level - 1) * 1.9,
     cooldowns: SPELLS.map(() => 0),
+    healCooldown: 0,
     appliedPerks: new Set(),
     alive: true
   };
@@ -479,6 +496,7 @@ function updatePlayers(dt) {
     const dir = movementFromInputP1();
     movePlayer(p1, dir, dt);
     handleSpellInput(p1, false);
+    if (input.keys.has(HEAL_KEY)) tryHeal(p1);
   }
 
   if (p2?.alive) {
@@ -490,6 +508,7 @@ function updatePlayers(dt) {
   run.players.forEach((p) => {
     p.mp = clamp(p.mp + dt * 6.5, 0, p.maxMp);
     p.cooldowns = p.cooldowns.map((c) => Math.max(0, c - dt));
+    p.healCooldown = Math.max(0, p.healCooldown - dt);
     if (p.hp <= 0) p.alive = false;
   });
 }
@@ -568,6 +587,17 @@ function castSpell(player, spellIdx) {
     vy: dir.y * (spell.projectileSpeed || 220),
     ttl: spell.projectileTtl || 1.3
   });
+}
+
+function tryHeal(player) {
+  if (!player?.alive) return;
+  if (player.healCooldown > 0) return;
+  if (player.mp < HEAL_MANA_COST) return;
+  if (player.hp >= player.maxHp) return;
+  player.mp -= HEAL_MANA_COST;
+  player.healCooldown = HEAL_COOLDOWN_S;
+  player.hp = Math.min(player.maxHp, player.hp + player.maxHp * HEAL_PERCENT);
+  if (player.id === 1) setNotice("Heal activated.", 0.9, "top");
 }
 
 function updateSpawns() {
