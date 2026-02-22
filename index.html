@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project DAD</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Marcellus&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main id="app">
+    <canvas id="gameCanvas" aria-label="Project DAD game canvas"></canvas>
+
+    <section id="menuScreen" class="overlay visible">
+      <h1>Project DAD</h1>
+      <p class="subtitle">Medieval Greece Action RPG | 10-Level Cap + Final Trial</p>
+      <div class="menu-actions">
+        <button id="startBtn">New Campaign</button>
+        <button id="plusModeBtn" disabled>+Mode (Locked)</button>
+        <button id="creatorBtn">Character Creator</button>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="coopToggle" />
+        <span>Enable Co-Play (2.1x enemy scaling)</span>
+      </label>
+      <p class="hint">Desktop: P1 `WASD` + `J/I/K/L` | P2 `Arrows` + `6-9` | Pause `Esc`</p>
+      <p class="hint">Mobile: Touch left zone to move, use spell buttons on right.</p>
+    </section>
+
+    <section id="creatorScreen" class="overlay">
+      <h2>Character Creator</h2>
+      <div class="grid">
+        <label>Skin Tone
+          <select id="skinTone">
+            <option value="#f2d2b6">Light</option>
+            <option value="#d7a57c">Olive</option>
+            <option value="#ab774e">Tan</option>
+            <option value="#7c4f35">Deep</option>
+          </select>
+        </label>
+        <label>Facial Features
+          <select id="facialFeatures">
+            <option value="soft">Soft</option>
+            <option value="angular">Angular</option>
+            <option value="scarred">Scarred</option>
+          </select>
+        </label>
+        <label>Hair
+          <select id="hair">
+            <option value="short">Short</option>
+            <option value="braided">Braided</option>
+            <option value="long">Long</option>
+            <option value="shaved">Shaved</option>
+          </select>
+        </label>
+        <label>Build
+          <select id="build">
+            <option value="s">Small</option>
+            <option value="m" selected>Medium</option>
+            <option value="l">Large</option>
+          </select>
+        </label>
+        <label>Sex
+          <select id="sex">
+            <option value="M">M</option>
+            <option value="F">F</option>
+            <option value="0">0</option>
+          </select>
+        </label>
+        <label>Height
+          <select id="height">
+            <option value="s">Short</option>
+            <option value="m" selected>Medium</option>
+            <option value="l">Tall</option>
+          </select>
+        </label>
+      </div>
+      <div class="menu-actions">
+        <button id="saveCharacterBtn">Save Character</button>
+        <button id="backMenuBtn">Back</button>
+      </div>
+    </section>
+
+    <section id="pauseScreen" class="overlay">
+      <h2>Paused</h2>
+      <div id="pauseStats"></div>
+      <h3>High Scores</h3>
+      <ol id="highScoreList"></ol>
+      <div class="menu-actions">
+        <button id="resumeBtn">Resume</button>
+        <button id="quitBtn">Quit to Menu</button>
+      </div>
+    </section>
+
+    <section id="endScreen" class="overlay">
+      <h2 id="endTitle">Run Complete</h2>
+      <p id="endSummary"></p>
+      <div class="menu-actions">
+        <button id="restartBtn">Return to Menu</button>
+      </div>
+    </section>
+
+    <div id="hud" class="hud hidden">
+      <div class="bar-group">
+        <div class="bar"><span id="hpBar"></span></div>
+        <small>HP</small>
+      </div>
+      <div class="bar-group">
+        <div class="bar mana"><span id="mpBar"></span></div>
+        <small>Mana</small>
+      </div>
+      <div id="meta"></div>
+      <div id="spellPanel"></div>
+    </div>
+
+    <div id="touchControls" class="touch hidden">
+      <div id="movePad">Move</div>
+      <div id="spellButtons"></div>
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
